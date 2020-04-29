@@ -110,14 +110,68 @@ func (w *Waiter) done(resourceType, id string) (bool, error) {
 	}
 
 	if ok {
-		return w.checkDone(resourceType, id, data)
+		ok, err := w.checkDone(resourceType, id, data)
+
+		if resourceType == "host" && ok {
+			return w.waitContainers(resourceType, id)
+		}
+		return ok, err
 	}
 
 	if err := w.client.ById(resourceType, id, &data); err != nil {
 		return false, err
 	}
 
-	return w.checkDone(resourceType, id, data)
+	ok, err = w.checkDone(resourceType, id, data)
+
+	if resourceType == "host" && ok {
+		return w.waitContainers(resourceType, id)
+	}
+	return ok, err
+}
+
+func (w *Waiter) waitContainers(resourceType, id string) (bool, error) {
+	if resourceType != "host" {
+		return false, fmt.Errorf("Resource type must be host")
+	}
+
+	// Wait some time that scheduler start container on host
+	time.Sleep(10 * time.Second)
+
+	host, err := w.client.Host.ById(id)
+	if err != nil {
+		return false, err
+	}
+	instances := &client.InstanceCollection{}
+	err = w.client.GetLink(host.Resource, "instances", instances)
+	if err != nil {
+		return false, err
+	}
+
+	needWait := false
+	data := map[string]interface{}{}
+	for _, instance := range instances.Data {
+		if err := w.client.ById("instance", instance.Id, &data); err != nil {
+			return false, err
+		}
+		switch w.state {
+		case "active":
+			if (instance.State == "running" && instance.Transitioning == "no" && (data["healthState"] == "healthy" || data["healthCheck"] == nil)) == false {
+				needWait = true
+				logrus.Debugf("We wait %s (%s)", instance.Name, instance.Id)
+			}
+		case "inactive":
+			// all user container must be deleted
+			labels := (data["labels"]).(map[string]interface{})
+			if labels != nil && labels["io.rancher.container.system"] == nil && labels["io.rancher.stack.name"] != nil {
+				needWait = true
+				logrus.Debugf("We wait %s (%s)", instance.Name, instance.Id)
+			}
+		}
+
+	}
+
+	return !needWait, nil
 }
 
 func (w *Waiter) checkDone(resourceType, id string, data map[string]interface{}) (bool, error) {

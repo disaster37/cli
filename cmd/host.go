@@ -44,6 +44,13 @@ func HostCommand() cli.Command {
 				SkipFlagParsing: true,
 				Action:          hostCreate,
 			},
+			cli.Command{
+				Name:            "evacuate",
+				Usage:           "evacuate a host",
+				Description:     "\nEvacuate a host in the $RANCHER_ENVIRONMENT. Use `--env <envID>` or `--env <envName>` to select a different environment.\n\nExample:\n\t$ rancher --env k8slab host evacuate newHostName\n",
+				ArgsUsage:       "[NEWHOSTNAME...]",
+				Action:          hostEvacuate,
+			},
 		},
 	}
 }
