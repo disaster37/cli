@@ -156,7 +156,7 @@ func (w *Waiter) waitContainers(resourceType, id string) (bool, error) {
 		}
 		switch w.state {
 		case "active":
-			if (instance.State == "running" && instance.Transitioning == "no" && (data["healthState"] == "healthy" || data["healthCheck"] == nil)) == false {
+			if ((instance.State == "running" || instance.State == "stopped") && instance.Transitioning == "no" && (data["healthState"] == "healthy" || data["healthCheck"] == nil)) == false {
 				needWait = true
 				logrus.Debugf("We wait %s (%s)", instance.Name, instance.Id)
 			}
